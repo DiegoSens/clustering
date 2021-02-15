@@ -1,0 +1,202 @@
+---
+title: "Tarea Clúster - Los coches del jefe 2"
+author: "Diego Senso González"
+date: "2/12/2020"
+output:
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: '3'
+---
+```{r setup, include=FALSE}
+library(factoextra)
+library(FactoMineR)
+library(gplots)
+library(haven)
+library(imputeTS)
+library(skimr)
+library(cluster)
+library(gridExtra)
+library(corrplot)
+library(NbClust)
+
+coches <- read_sav("tterreno.sav")
+write.csv(coches, 'terreno.csv')
+head(coches)
+```
+
+```{r warning=FALSE, eval=FALSE, include=FALSE}
+skim(coches)
+```
+
+```{r echo=FALSE, include=FALSE}
+coches <- coches[c(1,3,6,8,9,13)]
+```
+
+```{r echo=FALSE}
+#coches$marca <- factor(coches$marca, levels = c('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17'),
+#                       labels = c('ASIA MOTORS','CHEVROLET','DAIHATSU','FORD','JEEP','KIA','LADA','LAND ROVER','MERCEDES'
+                                  #,'MITSUBISHI','NISSAN','OPEL','SSANGYONG','SUZUKI','TATA','TOYOTA','UAZ'))
+coches <- na_mean(coches, option = "mean")
+#head(coches)
+```
+
+```{r warning=FALSE, echo=FALSE, include=FALSE}
+summary(coches[,-1])
+```
+
+```{r echo=FALSE, fig.align = 'center', include=FALSE}
+par(mfrow=c(2,2))
+boxplot(coches$pvp, xlab = "Precio de venta al público", col = "coral")
+boxplot(coches$peso, xlab = "Peso en kilogramos", col = "cyan")
+boxplot(coches$plazas, xlab = "Número de plazas", col = "darkolivegreen1")
+boxplot(coches$velocida, xlab = "Velocidad en Km/h", col = "deeppink")
+par(mfrow=c(1,1))
+```
+
+```{r echo=FALSE, include=FALSE}
+#Creación de la matriz de correlaciones
+mat.cor <- cor(coches[,-1])
+
+#Matriz de distancias
+dist.cor <- as.dist(1 - mat.cor)
+round(as.matrix(dist.cor),  2)
+#fviz_dist(dist.cor, lab_size = 10)
+```
+
+```{r echo=FALSE, fig.width=5, fig.width=5, fig.align = 'center', include=FALSE}
+library(ggcorrplot)
+corrplot(mat.cor, method = "number", type = "upper", title = "Correlación entre las variables seleccionadas", tl.col = "black")
+```
+
+```{r echo=FALSE, include=FALSE}
+coches <- coches[,-3]
+names(coches) <- c("marca", "precio", "peso", "plazas", "velocidad")
+```
+
+
+## Objetivo
+
+El objetivo del presente informe es estudiar el número adecuado de grupos en los que dividir la colección de coches existente.
+
+## Primera observación
+
+De cara a realizar una primera aproximación, es posible observar en un plano dónde se sitúan cada una de las observaciones del dataset. Esto puede ofrecer una primera visión de las distancias entre los puntos, viendo cuáles están cercanos entre sí (observaciones que se asemejan) y en qué zonas las distancias se incrementan (observaciones con poca relación o poco similares).
+
+```{r echo=FALSE}
+data=coches[,-1]
+coches.eclust = eclust(data, FUNcluster = "kmeans", stand=TRUE,
+hc_metric="euclidean", nstart=25)
+```
+
+A simple vista, parece haber una alta concentración de datos en la parte centro-izquierda del plano, siendo menos los que se agrupan a la derecha. Esto podría significar una clara distinción entre unos y otros vehículos, algo que podría ser importante para la configuración posterior de grupos.
+
+Adicionalmente, este plano recoge los vehículos colocados en dos dimensiones. Como se puede observar en los ejes, la primera dimensión permite explicar más de la mitad de los casos (56.1% concretamente). Añadiendo la segunda dimensión, es posible estar explicando algo más de un 82%. Es una cantidad a tener en cuenta, ya que contar con dos dimensiones reduce mucho la dimensión y a cambio se logra explicar una cantidad considerablemente buena.
+
+## Número óptimo de clusters (30 índices)
+
+Para resolver el problema de determinar el número óptimo de clústers en los que agrupar todas las observaciones disponibles, la librería "NbClust" ofrece en un mismo contraste 30 índices diferentes que estudian esta cuestión. Se trabajará con un mínimo de clusters igual a 2 (por crear una pluralidad de grupos), y un máximo igual a 10 (que son los garajes que el jefe posee).
+
+```{r echo=FALSE, results='hide', include=FALSE}
+test = NbClust(data, distance = "euclidean", min.nc = 2,
+max.nc = 10, method = "complete", index ="all")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+fviz_nbclust(test) + theme_minimal() +
+labs(x="Número k de clusters", y="Frecuencia")
+```
+
+
+A la vista de los resultados, el número óptimo de clusters es 2, seguido de cerca de 3. Bastante más atrás está la opción de crear 6 clusters. Es un resultado comprensible, parece que al crear el número de grupos mínimo la agrupación es mejor y obtiene menos fallos. Al hacer dos grupos, gráficamente se observa que no hay solapamientos y las observaciones que entran en uno y otro grupo quedan bien definidas. Sin embargo, el jefe posee 10 garajes, por lo que no parecería lógico intentar almacenar los coches en solo dos. Además, los garajes cuentan con una capacidad limitada (15 plazas). Dadas estas circunstancias, se va a tratar de crear otra agrupación diferente con mayor número de clusters, pese a que el agrupamiento sea de peor calidad y puedan producirse solapamientos o errores en la inclusión de alguna observación dentro de un grupo.
+
+
+## Cluster pam
+
+Se prueba a realizar el cluster con la función de abreviación "pam". Se visualizan todas las posibles agrupaciones desde los dos hasta los diez grupos. No parece ser el mejor en este caso ya que desde la realización de 2 grupos ya aparecen solapamientos.
+
+```{r results='hide', eval=FALSE, include=FALSE, echo=FALSE}
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean",k = 2)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 3)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 4)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 5)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 6)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 7)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 8)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 10)
+```
+
+## Cluster kmeans
+
+Utilizando el cluster bajo la función "kmeans", la agrupación parece ligeramente mejor, y los solapamientos comienzan a aparecer a partir de los 5 grupos.
+
+```{r echo=FALSE, eval=FALSE, results='hide', echo=FALSE}
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 2)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 3)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 4)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 5)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 6)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 7)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 8)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 9)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 10)
+```
+
+## Cluster jerárquico
+
+Utilizando el cluster jerárquico, los solapamientos aparecen a partir de los dos grupos. En el momento de aumentar el número de estos, conmienzan a haber más de dos clusters que se solapan entre sí, por lo que no parece mejor método de agrupación.
+
+## Otros métodos
+
+Pese a no representarlos, se han probado el resto de funciones de agrupación como la "clara", "hclust" y "fanny" entre otras. Todas ofrecen solapamientos antes que el kmeans, por lo que se decide realizar la agrupación con esta función. Adicionalmente, otras distancias como la "manhattan" tampoco han ofrecido mejores resultados.
+
+Dado que la métrica "kmeans" ha ofrecido gráficamente mejores resultados, se trabará con ella.
+
+## Número de grupos escogidos
+
+Como se ha comentado anteriormente, lo recomendado por los 30 índices era agrupar en dos o tres clusters. Sin embargo, por las características concretas de la situación no parecía lo más adecuado. Con 5 grupos comienzan a aparecer los primeros solapamientos. Observando el test de los 30 índices realizado al comienzo, 6 clusters era la tercera opción más recomendada. Se procede a visualizar la creación de 6 grupos:
+
+
+```{r echo=FALSE,  results='hide'}
+cluster6 = eclust(data, FUNcluster = "kmeans", stand=TRUE,hc_metric="euclidean", k=6, nstart=25)
+```
+
+Con esta configuración, aparecen solapamientos entre los grupos 1-4 y 3-5. Sin embargo, los otros dos grupos aparecen muy bien definidos. Pese a existir estos solapamientos, son en observaciones puntuales.
+
+Se procede a visualizar la silueta del cluster creado:
+
+```{r, echo=FALSE}
+fviz_silhouette(cluster6)
+```
+
+Se puede observar que esta configuración pese a no obtener un buen average, comete pocos errores a la hora de agrupar. Probando con otro número de clusters este average no mejora significativamente, y en varios casos se cometen más errores. Adicionalmente, se ha tenido en cuenta la distribución geográfica de los garajes para elegir el número de clusters a realizar. Por último, podemos observar el número de coches incluidos en cada uno de los 6 grupos creados, a fin de localizarlos geográficamente en el apartado de conclusiones:
+
+```{r echo=FALSE,  results='hide'}
+cluster <- eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 6, graph = F)
+cluster$clsc <- cluster$cluster
+table(cluster$clsc)
+```
+
+
+## Conclusiones
+
+Como se puede observar, existen solapamientos claros con la creación de 6 grupos. Sin embargo, se ha decidido este proceder en este caso ya que pese a colocar mal algunas observaciones, podremos distribuir correctamente los coches por diferentes localizaciones, no dejando muy saturadas unas y muy vacías otras, lo que habría ocurrido en caso de haber seleccionado un bajo número de grupos. Además, al tener grupos con muchas observaciones habría que haber separado geográficamente coches con características similares.
+
+Observando el mapa de localizaciones de los garajes, las ditribución sería la siguiente:
+
+- Los grupos 3 y 5 (que se solapan en alguna observación y en total son los más numerosos) se localizarían en las propiedades en el sureste de Francia (zona de Mónaco y Cannes) y en la isla de Córcega. Estarían muy próximos geográficamente y llenarían 55 plazas del total de 60 que tendrían los cuatro garajes juntos.
+
+- El grupo 2, que a simple vista parece más disperso en las observaciones (26 coches) se repartiría entre los dos garajes del este, ya en territorio suizo.
+
+- El grupo 4 (26 coches) se situaría en los dos garajes del norte del mapa (cercanos a París). Cubriría 26 plazas de un total de 30 entre ambos garajes.
+
+- El grupo 6 (12 coches) que está más distanciado en la representación de clusteres anterior, se situará en el garaje del oeste de Francia, cerca de La Rochelle.
+
+- El grupo 1 (el menos numeroso con 6 vehículos) se lleva a Andorra.
+
+De esta forma, todos los garajes del jefe quedan ocupados. A nivel estádistico, lo más recomendable parecía inclinarse por realizar dos o tres grupos. Sin embargo, ante el caso presentado parecía lo mejor tratar de aumentar el número de grupos pese a perder algo de calidad en la agrupación de vehículos. En caso contrario, habría supuesto desperdiciar varios de los garajes que el jefe posee para dejarlos vacíos. Adicionalmente, trabajar con un número tan reducido de grupos no habría permitido diferenciar entre los coches, agrupando en clusters formados por coches más diferentes entre sí de lo que se puede obtener aumentando a 6 grupos.
+
+

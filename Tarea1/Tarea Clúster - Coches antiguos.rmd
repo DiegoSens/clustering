@@ -1,0 +1,135 @@
+---
+title: "Tarea Clúster - Los coches del jefe"
+author: "Diego Senso González"
+date: "24/11/2020"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: '3'
+---
+## Objetivo
+El objetivo de la presente práctica es realizar una primera aproximación hacia el dataset propuesto, escogiendo las variables idóneas para realizar el análisis que se completará más adelante.
+
+## Explicación del dataset
+Para la presente práctica, se cuenta con un dataset en el que cada observación (de un total de 125) representa una combinación de un coche adquirido junto con una serie de características referentes a ese vehículo.
+
+## Carga de librerías y el dataset
+Se cargan las librerías necesarias, además del dataset. En este caso viene en formato sav, por lo que la función a utilizar para leer los datos será diferente. Tras leer el archivo, se pasa a convertirlo a formato csv para no encontrar problemas en su posterior tratamiento.
+
+```{r setup, include=FALSE}
+library(factoextra)
+library(FactoMineR)
+library(gplots)
+library(haven)
+library(imputeTS)
+library(skimr)
+library(cluster)
+library(gridExtra)
+library(corrplot)
+
+coches <- read_sav("tterreno.sav")
+write.csv(coches, 'terreno.csv')
+head(coches)
+```
+
+Observamos el dataframe gracias a la función "skim" (no se ha incluido en el informe), de cara a obtener una idea de cómo se distribuyen y se comportan las variables. Esto facilitará la elección de variables posterior, ya que observar el comportamiento y valores de cada columna ofrecerá la lectura de que algunas de ellas no son interesantes para incluirlas.
+
+```{r warning=FALSE, eval=FALSE, include=FALSE}
+skim(coches)
+```
+
+## Selección de variables a utilizar
+
+De cara a agrupar los vehículos más adelante, se deben elegir una serie de variables consideradas como importantes. Estas se han seleccionado observando cuáles podrían ser diferenciadoras dentro del dataset. Tras haber realizado una aproximación a los datos y ver cómo se distribuyen, las variables que se ha decidido seleccionar son las siguientes:
+
+- **marca**: variable categórica que expresa la marca del fabricante del vehículo en formato numérico. Toma valores entre 1 y 17. Interesante por poder organizar coches en función de marcas.
+- **pvp**: precio de venta al público (en euros). Interesante para saber cuáles son más caros o baratos para almacenarlos en un lugar u otro.
+- **peso**: peso del vehículo (en kilogramos). Bueno para temas logísticos, transporte o de almacenaje de los vehículos.
+- **plazas**: número de plazas del vehículo. Buena para conocer el tamaño de los coches.
+- **velocida**: velocidad máxima que el vehículo alcanza (km por hora). Para observar si tienen un estilo más deportivo o familiar, entre otras cosas.
+
+Además de por los valores de estas variables, se han escogido en base a que parecen características lógicas en las que se podría pensar si la finalidad es clasificar grupos de vehículos que se parezcan entre sí y se diferencien con respecto a otros grupos. 
+
+## Variables descartadas
+
+- **modelo**: se trata de una variable de tipo texto que tiene 111 valores únicos, por lo que no parece adecuada para realizar una agrupación. Además, en el caso de desear agrupar coches por fabricante ya es útil la variable "marca", que sí se ha seleccionado.
+- **cilindro**: este caso es similar pero opuesto al anterior, ya que con tan sólo valores de cilindro entre 4, 6 y 8 no es clara la diferenciación.
+- **potencia**: la potencia del vehículo medida en caballos. Se ha descartado al finalizar el análisis dada su estrecha asociación la variable "velocidad".
+- **cc**: centímetros cúbicos. En esta sí que existe mayor dispersión de los datos, pero existen otras variables más claras que explican algo similar como la potencia. Por ello, en un ejercicio de reducción se prefiere dejar fuera esta variable.
+- **rpm**: revoluciones por minuto. Mismo caso que con la anterior varible, además de que los vehículos con una mayor velocidad tendrá ya mayor número de rpm, con lo que ya estaría explicada en parte.
+- **cons90**, **cons120**, **consurb**: consumo del vehículo en 90km/h, 120km/h y en contexto urbano. Pese a ser variables que ofrezcan una información que podría ser interesante, no se ha considerado como del todo relevantes dado que hay otras variables según las cuales parece más lógico agrupar una serie de coches si el objetivo va a ser distribuirlos en diferentes garajes.
+- **acelerac**: tiempo en segundos que el vehículo tarda en ir de 0 a 100 km/h. No se ha seleccionado porque cuenta con una gran cantidad de NAs.
+- **acel2**: se trata de una categórica que explica la aceleración. Al tener dos valores no parece tener demasiada calidad explicativa como para incluirla.
+
+Procedemos a selecionar las variables para el análisis.
+```{r echo=FALSE}
+coches <- coches[c(1,3,6,8,9,13)]
+```
+
+## Tratamiento de los datos
+
+Pasamos a sustituir los valores NA por la media de cada columna, de cara a no perder ninguna observación, ya que de eliminarlas estaríamos perdiendo registros de coches que se deben agrupar posteriormente. Tras esto, observamos las primeras filas del dataframe resultante.
+
+```{r echo=FALSE}
+coches$marca <- factor(coches$marca, levels = c('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17'),
+                       labels = c('ASIA MOTORS','CHEVROLET','DAIHATSU','FORD','JEEP','KIA','LADA','LAND ROVER','MERCEDES'
+                                  ,'MITSUBISHI','NISSAN','OPEL','SSANGYONG','SUZUKI','TATA','TOYOTA','UAZ'))
+coches <- na_mean(coches, option = "mean")
+head(coches)
+```
+
+## Descripción de los vehículos adquiridos
+
+Gracias a la función "summary", podemos observar la distribución de las diferentes variables seleccionadas, para coger una idea de cómo se comportan.
+
+```{r, warning=FALSE, echo=FALSE}
+summary(coches[,-1])
+```
+
+Para obtener una idea de los coches adquiridos es fundamental, pues ofrece entre otros los valores medios, mínimos y máximos de todas las observaciones, esto es, de los coches con los que contamos y pretendemos ordenar próximamente de forma eficiente y consistente. A continuación se realizarán gráficos boxplot. Así se pueden observar cómo se comportan la mediana, los cuartiles y los outliers existentes en cada una de las variables numéricas. En general, se puede obtener una rápida visión de los valores que suelen tomar los coches comprados en cada uno de estos aspectos.
+
+```{r echo=FALSE, fig.align = 'center'}
+par(mfrow=c(2,2))
+boxplot(coches$pvp, xlab = "Precio de venta al público", col = "coral")
+boxplot(coches$peso, xlab = "Peso en kilogramos", col = "cyan")
+boxplot(coches$plazas, xlab = "Número de plazas", col = "darkolivegreen1")
+boxplot(coches$velocida, xlab = "Velocidad en Km/h", col = "deeppink")
+par(mfrow=c(1,1))
+```
+
+Posteriormente, se pueden observar las distancias entre las variables escogidas. Cuanto más cercano es el valor a cero, más cercanas estarán dos variables entre sí. Mientras, cuanto más elevado es el dato más distanciadas se encontrarán.
+
+```{r echo=FALSE}
+#Creación de la matriz de correlaciones
+mat.cor <- cor(coches[,-1])
+
+#Matriz de distancias
+dist.cor <- as.dist(1 - mat.cor)
+round(as.matrix(dist.cor),  2)
+#fviz_dist(dist.cor, lab_size = 10)
+```
+
+Cercanas parecen entre sí variables como "velocidad" y "pvp". Parece una asociación lógica en principio, ya que los coches más rápidos suelen pertenecer a una categoría de automóviles de lujo y por ende su precio es más elevado. También parecen estar cercanas "peso" y "pvp", una asociación interesante, pues no parece tan obvia como en el caso anterior.
+
+En caso de variables lejanas entre sí, destaca el número de plazas con respecto a la velocidad y la potencia, entendiendo que normalmente los coches que sobresalen en estos dos últimos aspectos no suelen albergar a muchos ocupantes.
+
+Continuamos con la matriz de correlaciones:
+
+```{r echo=FALSE, fig.width=5, fig.width=5, fig.align = 'center'}
+library(ggcorrplot)
+corrplot(mat.cor, method = "number", type = "upper", title = "Correlación entre las variables seleccionadas", tl.col = "black")
+```
+
+Se puede observar una muy alta correlación entre las variables "potencia" y "velocidad", la cual destaca por encima del resto. El resto de correlaciones son positivas pero no presentan valores muy elevados.
+
+Tras esta visión y dada la estrecha relación entre "potencia" y "velocidad", se procede a eliminar también una de estas dos variables, debido a que están explicando cosas muy parecidas de los vehículos. Se elimina la "potencia" dado que resulta más explicativo y claro a priori agrupar por velocidad, pues los caballos de potencia son algo menos visuales.
+
+```{r echo=FALSE}
+coches <- coches[,-3]
+names(coches) <- c("marca", "precio", "peso", "plazas", "velocidad")
+```
+
+## Conclusiones
+
+No todas las variables con las que cuenta el dataset son fundamentales a la hora de agrupar. Por ello, se ha decidido eliminar una parte de ellas del análisis. Las decisiones han sido tomadas siguiendo los valores de las variables y configuración del dataset, las conclusiones extraídas de las diferentes medidas aplicadas, y por último la lógica sobre cuáles son los atributos que tiene sentido tener en cuenta a la hora de ordenar un grupo de coches. Finalmente, las variables escogidas y ya tratadas son: "marca", "precio", "peso", "plazas", "velocidad".

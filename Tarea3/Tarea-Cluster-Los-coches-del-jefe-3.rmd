@@ -1,0 +1,353 @@
+---
+title: "Tarea Clúster - Los coches del jefe 3"
+author: "Diego Senso González"
+date: "8/12/2020"
+output:
+  word_document: default
+  pdf_document:
+    latex_engine: xelatex
+---
+```{r setup, include=FALSE}
+library(factoextra)
+library(FactoMineR)
+library(gplots)
+library(haven)
+library(imputeTS)
+library(skimr)
+library(cluster)
+library(gridExtra)
+library(corrplot)
+library(NbClust)
+library(dplyr)
+
+coches <- read_sav("tterreno.sav")
+write.csv(coches, 'terreno.csv')
+head(coches)
+```
+
+```{r warning=FALSE, eval=FALSE, include=FALSE}
+skim(coches)
+```
+
+```{r echo=FALSE, include=FALSE}
+coches <- coches[c(1,3,6,8,9,13)]
+```
+
+```{r echo=FALSE}
+#coches$marca <- factor(coches$marca, levels = c('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17'),
+#                       labels = c('ASIA MOTORS','CHEVROLET','DAIHATSU','FORD','JEEP','KIA','LADA','LAND ROVER','MERCEDES'
+                                  #,'MITSUBISHI','NISSAN','OPEL','SSANGYONG','SUZUKI','TATA','TOYOTA','UAZ'))
+coches <- na_mean(coches, option = "mean")
+#head(coches)
+```
+
+```{r warning=FALSE, echo=FALSE, include=FALSE}
+summary(coches[,-1])
+```
+
+```{r echo=FALSE, fig.align = 'center', include=FALSE}
+par(mfrow=c(2,2))
+boxplot(coches$pvp, xlab = "Precio de venta al público", col = "coral")
+boxplot(coches$peso, xlab = "Peso en kilogramos", col = "cyan")
+boxplot(coches$plazas, xlab = "Número de plazas", col = "darkolivegreen1")
+boxplot(coches$velocida, xlab = "Velocidad en Km/h", col = "deeppink")
+par(mfrow=c(1,1))
+```
+
+```{r echo=FALSE, include=FALSE}
+#Creación de la matriz de correlaciones
+mat.cor <- cor(coches[,-1])
+
+#Matriz de distancias
+dist.cor <- as.dist(1 - mat.cor)
+round(as.matrix(dist.cor),  2)
+#fviz_dist(dist.cor, lab_size = 10)
+```
+
+```{r echo=FALSE, fig.width=5, fig.width=5, fig.align = 'center', include=FALSE}
+library(ggcorrplot)
+corrplot(mat.cor, method = "number", type = "upper", title = "Correlación entre las variables seleccionadas", tl.col = "black")
+```
+
+```{r echo=FALSE, include=FALSE}
+coches <- coches[,-3]
+names(coches) <- c("marca", "precio", "peso", "plazas", "velocidad")
+```
+
+
+```{r echo=FALSE, include=FALSE}
+data=coches[,-1]
+coches.eclust = eclust(data, FUNcluster = "kmeans", stand=TRUE,
+hc_metric="euclidean", nstart=25)
+```
+
+```{r echo=FALSE, results='hide', include=FALSE}
+test = NbClust(data, distance = "euclidean", min.nc = 2,
+max.nc = 10, method = "complete", index ="all")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+fviz_nbclust(test) + theme_minimal() +
+labs(x="Número k de clusters", y="Frecuencia")
+```
+
+```{r results='hide', eval=FALSE, include=FALSE, echo=FALSE}
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean",k = 2)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 3)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 4)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 5)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 6)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 7)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 8)
+eclust(coches, FUNcluster = "pam", stand = TRUE, hc_metric = "euclidean", k = 10)
+```
+
+
+```{r echo=FALSE, eval=FALSE, results='hide', echo=FALSE}
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 2)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 3)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 4)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 5)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 6)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 7)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 8)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 9)
+eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 10)
+```
+
+```{r echo=FALSE,  results='hide', include=FALSE}
+cluster6 = eclust(data, FUNcluster = "kmeans", stand=TRUE,hc_metric="euclidean", k=6, nstart=25)
+```
+
+```{r, echo=FALSE, include=FALSE}
+fviz_silhouette(cluster6)
+```
+
+```{r echo=FALSE, include=FALSE}
+cluster <- eclust(data, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 6, graph = F)
+cluster$clsc <- cluster$cluster
+table(cluster$clsc)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Objetivo
+
+El objetivo del presente informe es realizar la partición final de los 125 coches del jefe entre los grupos propuestos con anterioridad, especificando cuántos y cuáles son los vehículos que se asignan a cada uno de los clústers formados.
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+#Carga del dataset
+coches <- read_sav("tterreno.sav")
+write.csv(coches, 'terreno.csv')
+
+#Creamos dataset donde ponemos los modelos como nombre de las filas
+datam <- coches[c(3,8,9,13)]
+datam <- na_mean(data, option = "mean")
+coches$modelo <- with(datam, make.unique(as.character(coches$modelo)))
+rownames(datam) <- coches$modelo
+
+#Construccion de cluster de 6 grupos (se puede ver donde va cada modelo)
+clusterm <- eclust(datam, FUNcluster = "kmeans", stand = TRUE, hc_metric = "euclidean", nstart = 25,k = 6, graph = F)
+clusterm$clsc <- clusterm$cluster
+head(clusterm$clsc, 32)
+
+#Metemos el numero de grupo como columna
+grupos <- clusterm$cluster
+datamgrupos <- mutate(datam, grupos)
+rownames(datamgrupos) <- coches$modelo
+```
+
+## Vehículos por grupo
+
+Como anteriormente se había detallado, la agrupación final propuesta estaba conformada por 6 grupos. En informes anteriores se podía observar la representación gráfica en dos dimensiones. Siguiendo esta decisión, se podía observar también el número de vehículos que iban a conformar cada uno de los seis grupos. En formato histograma, se vería de la siguiente manera:
+
+```{r echo=FALSE,  results='hide', include=FALSE}
+cluster6 <- eclust(data, FUNcluster = "kmeans", stand=TRUE,hc_metric="euclidean", k=6, nstart=25)
+```
+
+```{r echo=FALSE, include=FALSE}
+cluster <- eclust(data, FUNcluster = "kmeans", stand = FALSE, hc_metric = "euclidean", nstart = 25,k = 6, graph = F)
+cluster$clsc <- cluster$cluster
+table(cluster$clsc)
+```
+
+```{r echo=FALSE}
+hist(datamgrupos$grupos, col = "orange", main = "Vehículos por grupo", xlab = "Grupo", ylab = "Número de vehículos")
+```
+
+Como se puede observar, cuatro de esos grupos cuentan con un número similar de coches y otros dos bastante por debajo. Esto hará que los grupos más numerosos tengan que repartirse en varios garajes próximos geográficamente, a fin de guardar coherencia en el reparto (cada garaje cuenta con una capacidad máxima de 15 vehículos).
+
+## Asignación por modelo
+
+Con este reparto, es posible visualizar a qué grupo de los seis construidos irá cada uno de los modelos propiedad del jefe. A continuación, se ofrece la lista con la partición realizada. Pese a haber coches del mismo modelo (como el "Rocsta 2.2 DX techo") se han tratado los valores para que no se omita ninguno y aparezcan todos y bien diferenciados. La composición será la siguiente:
+
+```{r include=FALSE, warning=FALSE}
+grupo1 <- filter(datamgrupos, grupos == 1)
+grupo2 <- filter(datamgrupos, grupos == 2)
+grupo3 <- filter(datamgrupos, grupos == 3)
+grupo4 <- filter(datamgrupos, grupos == 4)
+grupo5 <- filter(datamgrupos, grupos == 5)
+grupo6 <- filter(datamgrupos, grupos == 6)
+
+nrow(grupo1)
+summary(grupo1)
+
+nrow(grupo2)
+summary(grupo2)
+
+nrow(grupo3)
+summary(grupo3)
+
+nrow(grupo4)
+summary(grupo4)
+
+nrow(grupo5)
+summary(grupo5)
+
+nrow(grupo6)
+summary(grupo6)
+```
+
+## Grupo 1 (6 coches)
+
+```{r echo=FALSE}
+rownames(grupo1)
+```
+
+## Grupo 2 (26 coches)
+
+```{r echo=FALSE}
+rownames(grupo2)
+```
+
+## Grupo 3 (27 coches)
+
+```{r echo=FALSE}
+rownames(grupo3)
+```
+
+## Grupo 4 (26 coches)
+
+```{r echo=FALSE}
+rownames(grupo4)
+```
+
+## Grupo 5 (28 coches)
+
+```{r echo=FALSE}
+rownames(grupo5)
+```
+
+## Grupo 6 (12 coches)
+
+```{r echo=FALSE}
+rownames(grupo6)
+```
+
+Al poseer ya la distribución de los coches, se puede comparar las características de ellos entre sí, algo sin duda fundamental para argumentar la agrupación realizada. A fin de contrastar, funciones como "summary" o "skim" permiten realizar una primera aproximación a las principales métricas de estos grupos.
+
+De cara a hacer más concreto el análisis numérico, se han calculado los valores medios de cada una de las cuatro variables para cada grupo. De esta forma, será fácil ver cómo se han agrupado los vehículos, siguiendo qué variables y observando las diferencias (que en teoría deben existir entre unos y otros clusters). Se ha seleccionado para este análisis la media dado que no preocupa tanto en este caso la presencia de outliers, pues lo más probable es que el clustering haya incluido vehículos de características similares en cada uno de los grupos.
+
+# Características de los grupos
+
+## Precios (Pesetas)
+
+```{r echo=FALSE}
+precio1<-mean(grupo1$precio)
+precio2<-mean(grupo2$precio)
+precio3<-mean(grupo3$precio)
+precio4<-mean(grupo4$precio)
+precio5<-mean(grupo5$precio)
+precio6<-mean(grupo6$precio)
+precios <- cbind(precio1, precio2,precio3,precio4,precio5,precio6)
+
+peso1<-mean(grupo1$peso)
+peso2<-mean(grupo2$peso)
+peso3<-mean(grupo3$peso)
+peso4<-mean(grupo4$peso)
+peso5<-mean(grupo5$peso)
+peso6<-mean(grupo6$peso)
+pesos <- cbind(peso1, peso2,peso3,peso4,peso5,peso6)
+
+vel1<-mean(grupo1$velocidad)
+vel2<-mean(grupo2$velocidad)
+vel3<-mean(grupo3$velocidad)
+vel4<-mean(grupo4$velocidad)
+vel5<-mean(grupo5$velocidad)
+vel6<-mean(grupo6$velocidad)
+velocidades <- cbind(vel1, vel2,vel3,vel4,vel5,vel6)
+
+plazas1<-mean(grupo1$plazas)
+plazas2<-mean(grupo2$plazas)
+plazas3<-mean(grupo3$plazas)
+plazas4<-mean(grupo4$plazas)
+plazas5<-mean(grupo5$plazas)
+plazas6<-mean(grupo6$plazas)
+plazas <- cbind(plazas1, plazas2,plazas3,plazas4,plazas5,plazas6)
+
+precios
+#final <- cbind(precios, pesos,velocidades,plazas)
+```
+
+En cuanto a precios, se observa claramento que el sexto grupo es el que cuenta con los coches más caros. Guardan una gran diferencia con respecto al tercer grupo que es el segundo más caro. Fuera de ellos, no existen grandes diferencias entre los clústers de valor intermedio, llegando al grupo cuarto que con claridad es el que cuenta con los coches más baratos.
+
+## Pesos (Kilogramos)
+
+```{r echo=FALSE}
+pesos
+```
+
+En lo que al peso se refiere, cabe determinar que nuevamente el grupo 6 es el que tiene la media más elevada. El cuarto grupo, además de contar con los coches más baratos, resulta ser también el que cuenta con los vehículos más ligeros. En cuanto al resto, existen diferencias pero menos reseñables, ya que se encuentran en valores no demasiado distantes.
+
+## Velocidades (Kilómetros por hora)
+
+```{r echo=FALSE}
+velocidades
+```
+
+En cuanto a las velocidades, la situación está más equilibrada. El grupo 6 vuelve a ser el mayor, pero prácticamente igualado con el tercer grupo. Un escalón por debajo se encuentran los grupos 2, 4 y 5. Los vehículos más lentos se encuentran en este caso en el primer clúster, que era el menos numeroso con 6 coches.
+
+## Número de plazas
+
+```{r echo=FALSE}
+plazas
+```
+
+Por último, resulta llamativa la distribución del número de plazas. De forma muy clara, el segundo grupo cuenta con un número de plazas por coches muy superior al resto, y que para lo que suelen ser los vehículos es un dato llamativamente elevado (téngase en cuenta que en este caso se habla de todoterrenos, por lo que para este tipo de vehículos puede no ser tan inusual). En el resto de grupos, las plazas medias se encuentran en torno a 5 ó 6, marcándose ciertas diferencias. En último lugar, el grupo 1 (que era el más lento), es también el de los coches con menos plazas. Observándolo de cerca, todos los vehículos introuducidos en este grupo son biplaza.
+
+Un resultado similar se podría obtener observando los centroides de cada grupo. Estos no son necesariamente una observación sino que muestran el punto central o medio de cada clúster. Las cifras más elevadas en cada variable indican que los coches presentan unos valores más altos en esa variable, y los más bajos indican lo contrario. Los resultados (pese a ser diferentes) concuerdan en general en lo referente a la interpretación de cuáles grupos tienen los vehículos con mayor o menor valor de cada una de las variables.
+
+```{r echo=FALSE}
+cluster$centers
+```
+
+## Conclusiones
+
+Habiendo obtenido los vehículos que conformarán cada grupo y analizado sus rasgos técnicos, el siguiente paso es localizarlos geográficamente para que el jefe sepa dónde colocarlos. Observando el mapa de localizaciones de los garajes, las ditribución sería la siguiente:
+
+- Los grupos 3 y 5 se localizarían en las propiedades del sureste de Francia (zona de Mónaco y Cannes) y en la isla de Córcega. Estarían muy próximos geográficamente y llenarían 55 plazas del total de 60 que tendrían los cuatro garajes juntos. Ambos grupos tienen en común el número de plazas y el precio de los coches, cuyos indicadores son muy cercanos en ambos casos. Parece un sitio ideal para tener varios garajes y una gran cantidad de coches disponibles.
+
+- El grupo 2 se repartiría entre los dos garajes del este, ya en territorio suizo. Son los coches con mayor número de plazas y los segundos con menor velocidad media (ambas características propicias para realizar viajes por el escarpado territorio suizo sin prisas y poder llevar a toda la familia en un mismo coche).
+
+- El grupo 4 (26 coches) se situaría en los dos garajes del norte del mapa (cercanos a París). Cubriría 26 plazas de un total de 30 entre ambos garajes. Estos coches serán los más baratos y los más ligeros de toda la colección.
+
+- El grupo 6 (12 coches) se situará en el garaje del oeste de Francia, cerca de La Rochelle. Los más pesados con diferencia. También los más veloces, atributo útil en este caso dado que se trata de un garaje alejado del resto (siempre respetando los límites de velocidad).
+
+- El grupo 1 (el menos numeroso con 6 vehículos) se lleva a Andorra. Aquí estarán los seis coches biplaza del jefe. Son los menos veloces, indicado para la zona montañosa de Andorra donde el terreno no es tan apto para probar la velocidad de los vehículos.
+
+
